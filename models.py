@@ -278,8 +278,9 @@ class LanguageIDModel(object):
         self.input_dimension = self.num_chars
         self.output_dimension = len(self.languages)
         # hyperparameters
-        self.layers = 3
-        self.size = 128
+        self.layers = 5
+        ##best layers so far 5
+        self.size = 256
         self.multiplier = 0.005
         # end of hyperparameters
         self.m = []
@@ -326,6 +327,9 @@ class LanguageIDModel(object):
         z = nn.Linear(xs[0], self.m[0])
         for i in range(1, L):
             z = nn.Add(nn.Linear(xs[i], self.m[0]), nn.Linear(z, self.m[1]))
+        for i in range(2, self.layers-1):
+            z = nn.Linear(z, self.m[i])
+            z = nn.ReLU(z)
         z = nn.Linear(z, self.m[self.layers-1])
         return z
 
@@ -361,11 +365,10 @@ class LanguageIDModel(object):
             if (turn%64==0):
                 accuracy = dataset.get_validation_accuracy()
                 print(accuracy)
-            if (accuracy>=0.82):
+            if (accuracy>=0.85):
                 break
             trueY = y
             loss = self.get_loss(x, trueY)
-            numLoss = nn.as_scalar(loss)
             mixedGrad = nn.gradients(loss, self.m)
             for i in range(0, self.layers):
                 self.m[i].update(mixedGrad[i], -self.multiplier)
