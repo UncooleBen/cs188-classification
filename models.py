@@ -274,6 +274,22 @@ class LanguageIDModel(object):
 
         # Initialize your model parameters here
         "*** YOUR CODE HERE ***"
+        self.batch_size = 100
+        self.input_dimension = self.num_chars
+        self.output_dimension = len(self.languages)
+        # hyperparameters
+        self.layers = 3
+        self.size = 400
+        self.multiplier = 0.005
+        # end of hyperparameters
+        self.m = []
+        for i in range(self.layers):
+            if (i==0):
+                self.m.append(nn.Parameter(self.input_dimension, self.size))
+            elif (i==self.layers-1):
+                self.m.append(nn.Parameter(self.size, self.output_dimension))
+            else:
+                self.m.append(nn.Parameter(self.size, self.size))
 
     def run(self, xs):
         """
@@ -305,6 +321,12 @@ class LanguageIDModel(object):
                 (also called logits)
         """
         "*** YOUR CODE HERE ***"
+        L = len(xs)
+        z = nn.Linear(xs[0], self.m[0])
+        for i in range(1, L):
+            z = nn.Add(nn.Linear(xs[i], self.m[0]), nn.Linear(z, self.m[1]))
+        z = nn.Linear(z, self.m[2])
+        return z
 
     def get_loss(self, xs, y):
         """
@@ -321,9 +343,35 @@ class LanguageIDModel(object):
         Returns: a loss node
         """
         "*** YOUR CODE HERE ***"
+        predictedY = self.run(xs)
+        loss = nn.SoftmaxLoss(predictedY, y)
+        return loss
+        
 
     def train(self, dataset):
         """
         Trains the model.
         """
         "*** YOUR CODE HERE ***"
+        batch_size = self.batch_size
+        accuracy = 0
+        turn = 0
+        while (True):
+            breakFlag = False
+            for x, y in dataset.iterate_once(batch_size):
+                turn += 1
+                if (turn%1000==0):
+                    accuracy = dataset.get_validation_accuracy()
+                    print(accuracy)
+                if (accuracy>0.83):
+                    breakFlag = True
+                    break
+                trueY = y
+                loss = self.get_loss(x, trueY)
+                numLoss = nn.as_scalar(loss)
+                mixedGrad = nn.gradients(loss, self.m)
+                length = len(mixedGrad)
+                for i in range(0, self.layers):
+                    self.m[i].update(mixedGrad[i], -self.multiplier)
+            if (breakFlag):
+                break
